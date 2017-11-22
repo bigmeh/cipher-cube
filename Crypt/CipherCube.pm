@@ -1,4 +1,4 @@
-package Crypt::CipherCube;
+package Crypt::CipherCube2;
 
 use Mouse;
 use Encode;
@@ -33,25 +33,34 @@ sub enc {
     my $encoded;
     if (-f $data) { # is a filehandle
 
+        # decompose file into individual bits
         my @data;
         while (read($data, my $byte, 1024)) {
-
-            my @bits = unpack('B8' x 1024, $byte);
+            my @bits = split('', unpack('B*', $byte));
 
             push(@data, @bits);
         }
+
         my $traversal_map = $self->_traversal_map->traversal_map;
-        foreach my $byte (@data) {
+
+        my @enc_bits;
+        foreach my $bit (@data) {
 
             my $tk = hex $self->_traversal_key_hex->[$key_pos];
             my $traversal = $traversal_map->[$tk];
 
             $self->cube->$traversal;
 
-            $encoded .= pack('B*', unpack('B8', $self->cube->val_at_cursor) ^ $byte);
-
+            my $enc_bit = $self->cube->val_at_cursor ^ $bit;
             $key_pos++;
             $key_pos = 0 if $key_pos >= $key_size;
+
+            push(@enc_bits, $enc_bit);
+
+            if (scalar @enc_bits == 8) {
+                $encoded .= pack('B8', join('', @enc_bits));
+                @enc_bits = ();
+            }
         }
     }
     else { # is a string of data
@@ -90,23 +99,48 @@ sub dec {
         my @data;
         while (read($data, my $byte, 1024)) {
 
-            my @bits = unpack('B8' x 1024, $byte);
+            my @bits = split('', unpack('B*', $byte));
 
             push(@data, @bits);
         }
 
+        my @dec_bits;
         foreach my $byte (@data) {
-            my $tk = hex $self->_traversal_key_hex->[$key_pos];
-            my $traversal = $self->_traversal_map->traversal_map->[$tk];
 
-            $self->cube->$traversal;
+#            $self->cube->$traversal;
 
-            my $bitmask = unpack('B8', $self->cube->val_at_cursor);
+#            die join(', ', split('', $byte));
 
-            $decoded .= pack('B8', $bitmask ^ $byte);
+ #           my $dec_bits;
+ #           foreach my $bit (split('', $byte)) {
+                my $tk = hex $self->_traversal_key_hex->[$key_pos];
+                my $traversal = $self->_traversal_map->traversal_map->[$tk];
 
-            $key_pos++;
-            $key_pos = 0 if $key_pos >= $key_size;
+                $self->cube->$traversal;
+                my $dec_bit = $self->cube->val_at_cursor ^ $byte;
+                $key_pos++;
+                $key_pos = 0 if $key_pos >= $key_size;
+ #           }
+
+
+#            my $bitmask = unpack('B', $self->cube->val_at_cursor);
+
+#            $decoded .= pack('B', $bitmask ^ $byte);
+
+
+
+
+            push(@dec_bits, $dec_bit);
+
+            if (scalar @dec_bits == 8) {
+                $decoded .= pack('B8', join('', @dec_bits));
+                undef @dec_bits;
+            }
+
+
+
+#            $key_pos++;
+#            $key_pos = 0 if $key_pos >= $key_size;
         }
     }
     else { # is a string of data
@@ -145,6 +179,7 @@ sub _apply_seed {
         2 => 'rotate_z',
     );
 
+    # rotate from zero to three times around the x, y, and z axes
     for (my $i=0; $i<=2; $i++) {
         confess "Rotation seed numbers must be values from 0 to 3"
             if $child->[$i] !~ /^[0-3]$/;
@@ -156,7 +191,7 @@ sub _apply_seed {
     my $set_cursor;
     for (my $i=3; $i<=5; $i++) {
         confess "Position seed numbers must be values from 0 to one less than the edge length of the cube"
-            if $child->[$i] < 1 || $child->[$i] >= $self->cube->size;
+            if $child->[$i] < 0 || $child->[$i] >= $self->cube->size;
 
         $set_cursor->[$i-3] = $child->[$i];
     }
