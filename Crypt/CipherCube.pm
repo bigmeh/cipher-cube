@@ -1,4 +1,4 @@
-package Crypt::CipherCube2;
+package Crypt::CipherCube;
 
 use Mouse;
 use Encode;
@@ -107,28 +107,13 @@ sub dec {
         my @dec_bits;
         foreach my $byte (@data) {
 
-#            $self->cube->$traversal;
+            my $tk = hex $self->_traversal_key_hex->[$key_pos];
+            my $traversal = $self->_traversal_map->traversal_map->[$tk];
 
-#            die join(', ', split('', $byte));
-
- #           my $dec_bits;
- #           foreach my $bit (split('', $byte)) {
-                my $tk = hex $self->_traversal_key_hex->[$key_pos];
-                my $traversal = $self->_traversal_map->traversal_map->[$tk];
-
-                $self->cube->$traversal;
-                my $dec_bit = $self->cube->val_at_cursor ^ $byte;
-                $key_pos++;
-                $key_pos = 0 if $key_pos >= $key_size;
- #           }
-
-
-#            my $bitmask = unpack('B', $self->cube->val_at_cursor);
-
-#            $decoded .= pack('B', $bitmask ^ $byte);
-
-
-
+            $self->cube->$traversal;
+            my $dec_bit = $self->cube->val_at_cursor ^ $byte;
+            $key_pos++;
+            $key_pos = 0 if $key_pos >= $key_size;
 
             push(@dec_bits, $dec_bit);
 
@@ -136,11 +121,6 @@ sub dec {
                 $decoded .= pack('B8', join('', @dec_bits));
                 undef @dec_bits;
             }
-
-
-
-#            $key_pos++;
-#            $key_pos = 0 if $key_pos >= $key_size;
         }
     }
     else { # is a string of data
@@ -197,7 +177,6 @@ sub _apply_seed {
     }
     $self->cube->cursor( $set_cursor );
 
-    #my $traversal_start = defined $child->[6] ? $child->[6] : 0;
     my $traversal_order = defined $child->[6] ? uc($child->[6]) : '0123456789ABCDEF';
     warn "No traversal order string used, default used instead (this is much less secure)"
         if (!defined $child->[6]);
